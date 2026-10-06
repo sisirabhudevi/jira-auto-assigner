@@ -1,0 +1,52 @@
+{
+  "mappings": [
+    {
+      "feature": "Authentication & SSO",
+      "keywords": ["auth", "SSO", "SAML", "OAuth", "LDAP", "login", "session", "token", "MFA", "2FA"],
+      "engineer": "Alex Rivera",
+      "jira_username": "arivera"
+    },
+    {
+      "feature": "Networking & Firewall",
+      "keywords": ["firewall", "NAT", "route", "BGP", "OSPF", "IPSec", "VPN", "tunnel", "packet", "ACL"],
+      "engineer": "Jordan Lee",
+      "jira_username": "jlee"
+    },
+    {
+      "feature": "SSL/TLS & Certificates",
+      "keywords": ["SSL", "TLS", "certificate", "cert", "handshake", "cipher", "mTLS", "PKI", "CA", "X.509"],
+      "engineer": "Morgan Chen",
+      "jira_username": "mchen"
+    },
+    {
+      "feature": "DNS & Traffic Routing",
+      "keywords": ["DNS", "FQDN", "hostname", "resolver", "nameserver", "A record", "CNAME", "TTL"],
+      "engineer": "Sam Patel",
+      "jira_username": "spatel"
+    },
+    {
+      "feature": "Threat Detection & Prevention",
+      "keywords": ["malware", "threat", "intrusion", "IDS", "IPS", "exploit", "CVE", "vulnerability", "signature"],
+      "engineer": "Casey Kim",
+      "jira_username": "ckim"
+    },
+    {
+      "feature": "Logging & Observability",
+      "keywords": ["log", "syslog", "SIEM", "alert", "monitoring", "metrics", "tracing", "audit", "event"],
+      "engineer": "Riley Thompson",
+      "jira_username": "rthompson"
+    },
+    {
+      "feature": "API & Integrations",
+      "keywords": ["API", "REST", "webhook", "integration", "endpoint", "payload", "HTTP", "rate limit", "SDK"],
+      "engineer": "Drew Nguyen",
+      "jira_username": "dnguyen"
+    },
+    {
+      "feature": "High Availability & Clustering",
+      "keywords": ["HA", "failover", "cluster", "redundancy", "active-passive", "active-active", "heartbeat", "sync"],
+      "engineer": "Taylor Brooks",
+      "jira_username": "tbrooks"
+    }
+  ]
+}

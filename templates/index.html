@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jira Auto Assigner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f7;
+      color: #0f172a;
+      min-height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #3730a3 100%);
+      color: white;
+      padding: 0 36px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 16px rgba(49,46,129,0.4);
+    }
+    .hdr-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .hdr-logo {
+      width: 38px; height: 38px;
+      background: rgba(255,255,255,0.13);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+    }
+    .hdr-title  { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; }
+    .hdr-sub    { font-size: 11.5px; opacity: 0.55; margin-top: 1px; }
+    .hdr-tagline {
+      font-size: 12px;
+      opacity: 0.55;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hdr-tagline-dot {
+      width: 6px; height: 6px;
+      background: rgba(255,255,255,0.4);
+      border-radius: 50%;
+    }
+
+    /* ── Page layout ─────────────────────────────────────────── */
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 26px 24px 70px;
+      display: grid;
+      grid-template-columns: 1fr 330px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    /* ── Search card ─────────────────────────────────────────── */
+    .search-card {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+    }
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .search-icon { color: #94a3b8; font-size: 15px; flex-shrink: 0; }
+    .search-row input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      color: #0f172a;
+      background: transparent;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .search-row input::placeholder { color: #94a3b8; font-weight: 400; }
+    .btn-assign {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .btn-assign:hover    { background: #4338ca; }
+    .btn-assign:active   { transform: scale(0.98); }
+    .btn-assign:disabled { background: #a5b4fc; cursor: not-allowed; transform: none; }
+
+    /* ── Step progress ───────────────────────────────────────── */
+    #stepsBar {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      font-size: 12.5px;
+      color: #94a3b8;
+      transition: color 0.3s;
+    }
+    .step.active { color: #4f46e5; font-weight: 600; }
+    .step.done   { color: #16a34a; }
+    .step-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+      transition: all 0.3s;
+      background: white;
+    }
+    .step.active .step-dot { border-color: #4f46e5; background: #eef2ff; color: #4f46e5; }
+    .step.done   .step-dot { border-color: #16a34a; background: #f0fdf4; color: #16a34a; font-size: 13px; }
+    .step-chevron { color: #cbd5e1; font-size: 12px; padding: 0 6px; flex-shrink: 0; }
+
+    @keyframes pulse-indigo {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(79,70,229,0.35); }
+      50%       { box-shadow: 0 0 0 5px rgba(79,70,229,0); }
+    }
+    .step.active .step-dot { animation: pulse-indigo 1.2s ease infinite; }
+
+    /* ── Alert bars ──────────────────────────────────────────── */
+    .alert {
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-bottom: 14px;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .alert-success  { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+    .alert-error    { background: #fff1f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .alert-badge {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .alert-success .alert-badge { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+
+    /* ── Ticket card ─────────────────────────────────────────── */
+    .ticket-card {
+      background: white;
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+    }
+    .tc-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .tc-key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tc-key-icon {
+      width: 26px; height: 26px;
+      background: #eef2ff;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      color: #4f46e5;
+      flex-shrink: 0;
+    }
+    .tc-key {
+      font-size: 13px;
+      font-weight: 700;
+      color: #4f46e5;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      letter-spacing: 0.03em;
+    }
+    .tc-ext-link {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #64748b;
+      text-decoration: none;
+      border: 1px solid #e2e8f0;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .tc-ext-link:hover { background: #f8fafc; color: #4f46e5; border-color: #c7d2fe; }
+    .tc-title {
+      font-size: 19px;
+      font-weight: 600;
+      color: #0f172a;
+      line-height: 1.4;
+      margin-bottom: 22px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid #e8ecf2;
+      border-radius: 9px;
+      overflow: hidden;
+    }
+    .meta-cell {
+      padding: 13px 16px;
+      border-right: 1px solid #e8ecf2;
+      border-bottom: 1px solid #e8ecf2;
+    }
+    .meta-cell:nth-child(4n) { border-right: none; }
+    .meta-cell:nth-last-child(-n+4) { border-bottom: none; }
+    .meta-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .meta-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: #0f172a;
+    }
+    .meta-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .pill-indigo { background: #eef2ff; color: #4338ca; }
+    .pill-orange { background: #fff7ed; color: #c2410c; }
+
+    /* ── Description card ────────────────────────────────────── */
+    .desc-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 14px;
+    }
+    .card-hdr {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .desc-text {
+      font-size: 12.5px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.75;
+      color: #334155;
+      max-height: 280px;
+      overflow-y: auto;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 14px 16px;
+    }
+    mark.kw {
+      background: #fef9c3;
+      color: #78350f;
+      border-radius: 3px;
+      padding: 1px 3px;
+      font-weight: 700;
+      border-bottom: 1.5px solid #fbbf24;
+    }
+
+    /* ── Right column ────────────────────────────────────────── */
+    .right-col { display: flex; flex-direction: column; gap: 14px; }
+
+    .panel {
+      background: white;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 8px 0;
+      border-bottom: 1px solid #f8fafc;
+      font-size: 13px;
+      gap: 12px;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .dl { color: #64748b; flex-shrink: 0; }
+    .dv { font-weight: 500; color: #0f172a; text-align: right; word-break: break-word; }
+
+    /* Assignee card */
+    .assignee-card {
+      background: linear-gradient(135deg, #1e1b4b, #3730a3 60%, #4f46e5);
+      border-radius: 10px;
+      padding: 20px;
+      color: white;
+      box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+    }
+    .assignee-card .card-hdr { color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 14px; }
+    .asgn-body {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .asgn-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+    .asgn-role { font-size: 11px; opacity: 0.65; }
+    .badge-assigned {
+      margin-left: auto;
+      background: rgba(134,239,172,0.25);
+      border: 1px solid rgba(134,239,172,0.5);
+      color: #bbf7d0;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .asgn-divider { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 0 0 14px; }
+    .asgn-note-lbl {
+      font-size: 10.5px;
+      opacity: 0.55;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .asgn-note-text {
+      font-size: 12px;
+      line-height: 1.65;
+      opacity: 0.82;
+      background: rgba(255,255,255,0.1);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .asgn-prev {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 14px;
+      background: rgba(0,0,0,0.15);
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+    .asgn-prev-name { text-decoration: line-through; opacity: 0.6; }
+
+    /* Confidence */
+    .conf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .conf-title  { font-size: 13px; font-weight: 600; color: #0f172a; }
+    .conf-pct    { font-size: 20px; font-weight: 800; color: #4f46e5; }
+    .conf-track  { height: 7px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+    .conf-fill   {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #4f46e5, #818cf8);
+      transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+      width: 0%;
+    }
+    .conf-sub { font-size: 11px; color: #94a3b8; }
+
+    /* Preview */
+    .preview-card {
+      background: white;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border: 1px dashed #c7d2fe;
+    }
+    .preview-card .card-hdr { color: #4338ca; }
+    .preview-body {
+      font-size: 11.5px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.65;
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+    .btn-confirm {
+      width: 100%;
+      background: #16a34a;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-confirm:hover    { background: #15803d; }
+    .btn-confirm:disabled { background: #86efac; cursor: not-allowed; }
+
+    .no-match {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 18px 22px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #78350f;
+    }
+    .no-match strong { display: block; font-size: 14px; margin-bottom: 5px; }
+
+    .spin {
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="hdr-brand">
+    <div class="hdr-logo">⚡</div>
+    <div>
+      <div class="hdr-title">Jira Auto Assigner</div>
+      <div class="hdr-sub">Intelligent routing of Jira tickets to the right engineer — at the right time.</div>
+    </div>
+  </div>
+  <div class="hdr-tagline">
+    <div class="hdr-tagline-dot"></div>
+    Smarter assignment&nbsp;&nbsp;·&nbsp;&nbsp;Faster resolution
+  </div>
+</header>
+
+<div class="page">
+
+  <div class="left-col">
+
+    <div class="search-card">
+      <div class="search-row">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          id="ticketInput"
+          placeholder="Enter Jira ticket ID — e.g. PROJ-1234"
+          onkeydown="if(event.key==='Enter') run()"
+          autofocus
+        />
+        <button class="btn-assign" id="runBtn" onclick="run()">
+          <span>⚡</span> Auto Assign
+        </button>
+      </div>
+    </div>
+
+    <div id="stepsBar" class="hidden">
+      <div class="step" id="s1"><div class="step-dot" id="d1">1</div>Fetching ticket</div>
+      <div class="step-chevron">›</div>
+      <div class="step" id="s2"><div class="step-dot" id="d2">2</div>Analyzing metadata</div>
+      <div class="step-chevron">›</div>
+      <div class="step" id="s3"><div class="step-dot" id="d3">3</div>Match found</div>
+      <div class="step-chevron">›</div>
+      <div class="step" id="s4"><div class="step-dot" id="d4">4</div>Assigning in Jira</div>
+    </div>
+
+    <div id="alertBox" class="hidden"></div>
+
+    <div id="ticketCard" class="ticket-card hidden">
+      <div class="tc-top">
+        <div class="tc-key-row">
+          <div class="tc-key-icon">🎫</div>
+          <span class="tc-key" id="tcKey"></span>
+        </div>
+        <a class="tc-ext-link" id="tcLink" target="_blank">🔗 Open in Jira ↗</a>
+      </div>
+      <div class="tc-title" id="tcTitle"></div>
+      <div class="meta-grid" id="metaGrid"></div>
+    </div>
+
+    <div id="descCard" class="desc-card hidden">
+      <div class="card-hdr">📄 Description</div>
+      <div class="desc-text" id="descText"></div>
+    </div>
+
+    <div id="noMatchCard" class="no-match hidden">
+      <strong>⚠ No engineer match found</strong>
+      No keywords from <code>mappings.json</code> matched this ticket's metadata.<br>
+      Add more feature → engineer entries to expand coverage.
+    </div>
+
+  </div>
+
+  <div class="right-col">
+
+    <div id="detailsPanel" class="panel hidden">
+      <div class="card-hdr">📋 Ticket Details</div>
+      <div id="detailsList"></div>
+    </div>
+
+    <div id="confCard" class="panel hidden">
+      <div class="conf-header">
+        <span class="conf-title">Match Confidence</span>
+        <span class="conf-pct" id="confPct">0%</span>
+      </div>
+      <div class="conf-track"><div class="conf-fill" id="confFill"></div></div>
+      <div class="conf-sub" id="confSub"></div>
+    </div>
+
+    <div id="previewCard" class="preview-card hidden">
+      <div class="card-hdr">💬 Comment Preview</div>
+      <div class="preview-body" id="previewBody"></div>
+      <button class="btn-confirm" id="confirmBtn" onclick="confirmAssign()">
+        ✓ Confirm &amp; Post to Jira
+      </button>
+    </div>
+
+    <div id="assigneeCard" class="assignee-card hidden">
+      <div class="card-hdr">👤 Assignee</div>
+      <div id="asgn-prev-row" class="asgn-prev hidden">
+        <span class="asgn-prev-name" id="prevAssigneeName"></span>
+        <span>→</span>
+      </div>
+      <div class="asgn-body">
+        <div class="avatar" id="asgn-avatar"></div>
+        <div>
+          <div class="asgn-name" id="asgn-name"></div>
+          <div class="asgn-role" id="asgn-role"></div>
+        </div>
+        <span class="badge-assigned">Assigned</span>
+      </div>
+      <hr class="asgn-divider">
+      <div class="asgn-note-lbl">💬 Assignment Note</div>
+      <div class="asgn-note-text" id="asgn-note"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function stepActive(n) {
+  for (let i = 1; i <= 4; i++) {
+    const s = document.getElementById(`s${i}`);
+    const d = document.getElementById(`d${i}`);
+    s.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+    d.textContent = i < n ? '✓' : i;
+  }
+}
+function stepDone(n) {
+  document.getElementById(`s${n}`).className = 'step done';
+  document.getElementById(`d${n}`).textContent = '✓';
+}
+function alert_(type, msg, badge) {
+  const box = document.getElementById('alertBox');
+  box.className = `alert alert-${type}`;
+  box.innerHTML = msg + (badge ? `<span class="alert-badge">${badge}</span>` : '');
+  box.classList.remove('hidden');
+}
+function clearAlert() { document.getElementById('alertBox').classList.add('hidden'); }
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function highlight(escapedText, keywords) {
+  if (!keywords || !keywords.length) return escapedText;
+  const pattern = new RegExp(
+    '(' + keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')',
+    'gi'
+  );
+  return escapedText.replace(pattern, '<mark class="kw">$1</mark>');
+}
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : (parts[0] || '?').slice(0, 2).toUpperCase();
+}
+function buildCommentPreview(engineer, feature, keywordDetails) {
+  const rows = keywordDetails.length
+    ? keywordDetails.map(d => `| ${d.keyword} | ${d.found_in.join(', ')} |`).join('\n')
+    : '| — | — |';
+
+  const fieldMap = {};
+  keywordDetails.forEach(d => {
+    d.found_in.forEach(f => { (fieldMap[f] = fieldMap[f] || []).push(d.keyword); });
+  });
+  const fieldNames = Object.keys(fieldMap);
+  const fieldsStr = fieldNames.length === 0 ? 'metadata'
+    : fieldNames.length === 1 ? fieldNames[0]
+    : fieldNames.length === 2 ? `${fieldNames[0]} and ${fieldNames[1]}`
+    : fieldNames.slice(0, -1).join(', ') + `, and ${fieldNames[fieldNames.length - 1]}`;
+
+  const allKws = [...new Set(keywordDetails.map(d => d.keyword))];
+  const kwsStr = allKws.map(k => `"${k}"`).join(' / ');
+
+  const reason = keywordDetails.length
+    ? `The ticket's ${fieldsStr} consistently reference ${feature}-specific terminology (${kwsStr}), indicating this issue falls within the *${feature}* subsystem. Based on the affected component, this has been routed to *${engineer}*, the assigned maintainer for this module.`
+    : `The ticket metadata maps to the *${feature}* subsystem. *${engineer}* is the assigned maintainer for this component.`;
+
+  return `🤖 Jira Auto Assigner
+----
+|| 👤 Assigned to || ${engineer} ||
+|| 🏷 Feature area || ${feature} ||
+|| ✅ Status || Auto-assigned ||
+
+*Reason for assignment*
+${reason}
+
+*Keyword Analysis*
+|| Keyword || Matched in ||
+${rows}
+
+_(Assigned via Jira Auto Assigner)_`;
+}
+
+function metaCell(icon, label, value, pillClass) {
+  const val = pillClass
+    ? `<span class="meta-pill ${pillClass}">${esc(value)}</span>`
+    : `<span class="meta-value">${esc(value || '—')}</span>`;
+  return `<div class="meta-cell">
+    <div class="meta-label"><span>${icon}</span>${esc(label)}</div>
+    ${val}
+  </div>`;
+}
+function detailRow(label, value) {
+  return `<div class="detail-row"><span class="dl">${esc(label)}</span><span class="dv">${esc(value || '—')}</span></div>`;
+}
+
+function renderTicket(ticket, ticketUrl) {
+  document.getElementById('tcKey').textContent = ticket.key;
+  document.getElementById('tcTitle').textContent = ticket.summary;
+  document.getElementById('tcLink').href = ticketUrl || '#';
+
+  const priorityPill = p => {
+    const lo = (p || '').toLowerCase();
+    return (lo.includes('critical') || lo.includes('high') || lo.includes('p1') || lo.includes('p2'))
+      ? 'pill-orange' : 'pill-indigo';
+  };
+
+  document.getElementById('metaGrid').innerHTML =
+    metaCell('🔵', 'TYPE', ticket.issue_type, 'pill-indigo') +
+    metaCell('✏️', 'PRIORITY', ticket.priority, priorityPill(ticket.priority)) +
+    metaCell('🧩', 'COMPONENT', ticket.components.join(', ') || '—', null) +
+    metaCell('🏷', 'SUB TYPE', ticket.sub_type || ticket.labels[0] || '—', null) +
+    metaCell('📁', 'PROJECT', ticket.project || '—', null) +
+    metaCell('🎯', 'TECHNICAL AREA', ticket.tech_domain || '—', null) +
+    metaCell('👤', 'SUBMITTED BY', ticket.reporter, null) +
+    metaCell('👥', 'ASSIGNED TO', ticket.assignee, null) +
+    metaCell('📅', 'CREATED', ticket.created, null) +
+    metaCell('🔄', 'UPDATED', ticket.updated, null) +
+    metaCell('⚡', 'EPIC', ticket.epic_link || '—', null);
+
+  document.getElementById('ticketCard').classList.remove('hidden');
+}
+
+function renderDescription(text, keywords) {
+  document.getElementById('descText').innerHTML = highlight(esc(text || '(no description)'), keywords);
+  document.getElementById('descCard').classList.remove('hidden');
+}
+
+function renderSidebar(ticket) {
+  document.getElementById('detailsList').innerHTML =
+    detailRow('Type', ticket.issue_type) +
+    detailRow('Priority', ticket.priority) +
+    detailRow('Component', ticket.components.join(', ')) +
+    detailRow('Technical Area', ticket.tech_domain) +
+    detailRow('Sub Type', ticket.sub_type || ticket.labels[0]) +
+    detailRow('Project', ticket.project) +
+    detailRow('Epic', ticket.epic_link) +
+    detailRow('Created By', ticket.reporter) +
+    detailRow('Created On', ticket.created);
+  document.getElementById('detailsPanel').classList.remove('hidden');
+}
+
+function renderConfidence(matchCount, keywordDetails) {
+  const pct = Math.round(Math.min(matchCount / 5, 1) * 100);
+  const uniqueFields = new Set(keywordDetails.flatMap(d => d.found_in)).size;
+  document.getElementById('confPct').textContent = pct + '%';
+  document.getElementById('confSub').textContent =
+    `${matchCount} keyword match${matchCount !== 1 ? 'es' : ''} across ${uniqueFields} field${uniqueFields !== 1 ? 's' : ''}`;
+  document.getElementById('confCard').classList.remove('hidden');
+  setTimeout(() => { document.getElementById('confFill').style.width = pct + '%'; }, 100);
+}
+
+function showCommentPreview(engineer, feature, keywordDetails) {
+  document.getElementById('previewBody').textContent = buildCommentPreview(engineer, feature, keywordDetails);
+  document.getElementById('previewCard').classList.remove('hidden');
+  document.getElementById('confirmBtn').disabled = false;
+  return new Promise(resolve => { window._resolveConfirm = resolve; });
+}
+function confirmAssign() {
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('confirmBtn').innerHTML = '<span class="spin"></span> Posting…';
+  if (window._resolveConfirm) window._resolveConfirm();
+}
+
+async function run() {
+  const input    = document.getElementById('ticketInput');
+  const btn      = document.getElementById('runBtn');
+  const ticketId = input.value.trim().toUpperCase();
+  if (!ticketId) { alert_('error', '⚠ Please enter a ticket ID.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Analyzing…';
+  clearAlert();
+  ['ticketCard','descCard','noMatchCard','detailsPanel','confCard','previewCard','assigneeCard']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+
+  const stepsBar = document.getElementById('stepsBar');
+  stepsBar.classList.remove('hidden');
+  stepActive(1);
+
+  try {
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket_id: ticketId }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) { stepDone(1); alert_('error', '⚠ ' + (data.error || 'Something went wrong.')); return; }
+
+    stepActive(2);
+    await delay(550);
+
+    const { ticket, matches, ticket_url } = data;
+    renderTicket(ticket, ticket_url);
+    renderSidebar(ticket);
+    renderDescription(ticket.description, matches.length ? matches[0].matched_keywords : []);
+
+    stepActive(3);
+    await delay(500);
+
+    if (!matches || matches.length === 0) {
+      stepDone(3);
+      document.getElementById('noMatchCard').classList.remove('hidden');
+      return;
+    }
+
+    const best = matches[0];
+    renderConfidence(best.match_count, best.keyword_details || []);
+    stepDone(3);
+
+    await showCommentPreview(best.engineer, best.feature, best.keyword_details || []);
+
+    stepActive(4);
+
+    const assignResp = await fetch('/api/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticket_id:       ticket.key,
+        jira_username:   best.jira_username,
+        engineer:        best.engineer,
+        feature:         best.feature,
+        keyword_details: best.keyword_details || [],
+      }),
+    });
+    const result = await assignResp.json();
+
+    if (!assignResp.ok) { alert_('error', '⚠ ' + (result.error || 'Assignment failed.')); return; }
+
+    stepDone(4);
+    document.getElementById('previewCard').classList.add('hidden');
+    clearAlert();
+    alert_('success',
+      `✓ Assigned to <strong>${esc(best.engineer)}</strong> — comment posted with full reasoning.`,
+      'Assignment Complete');
+
+    // Assignee card
+    document.getElementById('asgn-avatar').textContent = initials(best.engineer);
+    document.getElementById('asgn-name').textContent   = best.engineer;
+    document.getElementById('asgn-role').textContent   = best.feature;
+
+    const prevRow = document.getElementById('asgn-prev-row');
+    const isReplacing = ticket.assignee && ticket.assignee !== 'Unassigned' && ticket.assignee !== '—';
+    if (isReplacing) {
+      document.getElementById('prevAssigneeName').textContent = ticket.assignee;
+      prevRow.classList.remove('hidden');
+    } else {
+      prevRow.classList.add('hidden');
+    }
+
+    const note = buildCommentPreview(best.engineer, best.feature, best.keyword_details || []);
+    document.getElementById('asgn-note').textContent =
+      note.split('*Reason for assignment*\n')[1]?.split('\n\n')[0] || note.slice(0, 200);
+    document.getElementById('assigneeCard').classList.remove('hidden');
+
+  } catch (e) {
+    alert_('error', '⚠ Network error — is the Flask server running?');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>⚡</span> Auto Assign';
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
