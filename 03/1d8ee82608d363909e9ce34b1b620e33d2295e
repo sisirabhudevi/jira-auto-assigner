@@ -1,0 +1,26 @@
+.env.example
+  h_4c3f1a8d57f4b9 1-7
+.gitignore
+  h_4c3f1a8d57f4b9 1-9
+README.md
+  h_4c3f1a8d57f4b9 1-73
+app.py
+  h_4c3f1a8d57f4b9 1-304
+mappings.json
+  h_4c3f1a8d57f4b9 1-52
+requirements.txt
+  h_4c3f1a8d57f4b9 1-2
+templates/index.html
+  h_4c3f1a8d57f4b9 1-869
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "031d8ee82608d363909e9ce34b1b620e33d2295e",
+  "prompts": {},
+  "humans": {
+    "h_4c3f1a8d57f4b9": {
+      "author": "sisirabhudevi <sisirabhudevi@gmail.com>"
+    }
+  }
+}
